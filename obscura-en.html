@@ -1,0 +1,1714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Obscura — Camera Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #080810;
+  --panel: #0e0e18;
+  --panel2: #12121e;
+  --border: #1c1c2e;
+  --border2: #252538;
+  --accent: #d4a843;
+  --accent2: #6ba3c8;
+  --accent3: #c86b6b;
+  --text: #c8c8e0;
+  --muted: #4a4a68;
+  --muted2: #6a6a88;
+  --green: #6bc87a;
+  --red: #c86b6b;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { font-size: 14px; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── HEADER ── */
+header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem;
+  font-style: italic;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+.logo sub {
+  font-size: 0.5rem;
+  font-style: normal;
+  font-family: 'DM Mono', monospace;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted2);
+  display: block;
+  margin-top: -4px;
+}
+.tab-nav {
+  display: flex;
+  gap: 2px;
+}
+.tab-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted2);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tab-btn.active, .tab-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(212,168,67,0.06);
+}
+
+/* ── LAYOUT ── */
+.app-body { display: flex; flex: 1; overflow: hidden; }
+.section { display: none; flex: 1; }
+.section.active { display: flex; }
+
+/* ══════════════════════════════════════════
+   SECTION 1 — SIMULATOR
+══════════════════════════════════════════ */
+#sec-sim {
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+}
+#sec-sim.active { display: flex; }
+
+/* Viewfinder */
+.vf-wrap {
+  position: relative;
+  background: #000;
+  overflow: hidden;
+  width: 100%;
+  height: 56vw;
+  min-height: 220px;
+  max-height: 420px;
+  flex-shrink: 0;
+}
+#main-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.film-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+  transition: all 0.4s;
+}
+.grain-overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  z-index: 9;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 150px;
+  mix-blend-mode: overlay;
+}
+/* HUD */
+.hud {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+.hud-c { position:absolute; width:18px; height:18px; border-color:rgba(212,168,67,0.35); border-style:solid; }
+.hud-tl{top:14px;left:14px;border-width:1px 0 0 1px}
+.hud-tr{top:14px;right:14px;border-width:1px 1px 0 0}
+.hud-bl{bottom:14px;left:14px;border-width:0 0 1px 1px}
+.hud-br{bottom:14px;right:14px;border-width:0 1px 1px 0}
+.hud-bottom {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 16px;
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  color: rgba(212,168,67,0.75);
+}
+.hud-top-left {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  color: rgba(212,168,67,0.6);
+}
+.hud-top-right {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  color: rgba(107,163,200,0.8);
+  background: rgba(0,0,0,0.4);
+  padding: 3px 8px;
+  border: 1px solid rgba(107,163,200,0.25);
+}
+.meter-wrap {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.55rem;
+  color: rgba(212,168,67,0.5);
+  letter-spacing: 0.08em;
+}
+.meter-track {
+  width: 100px;
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+  position: relative;
+}
+.meter-fill {
+  position: absolute;
+  height: 100%;
+  background: var(--accent);
+  transition: all 0.25s;
+}
+.meter-center-tick {
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  width: 1px;
+  height: 9px;
+  background: rgba(255,255,255,0.2);
+}
+.film-badge {
+  position: absolute;
+  bottom: 18px;
+  right: 18px;
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  color: rgba(212,168,67,0.6);
+  font-style: italic;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 0.75rem;
+}
+
+/* ── CONTROLS PANEL ── */
+.ctrl-panel {
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  padding: 16px 16px 32px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  flex-shrink: 0;
+}
+/* Section labels span full width */
+.ctrl-panel .sec-label {
+  grid-column: 1 / -1;
+}
+/* Insight and warning also full width */
+.ctrl-panel .exp-warn,
+.ctrl-panel .insight-box {
+  grid-column: 1 / -1;
+}
+/* Light grid and film/wb grids: full width */
+.ctrl-panel .light-grid,
+.ctrl-panel .film-grid,
+.ctrl-panel .wb-grid {
+  grid-column: 1 / -1;
+}
+
+.sec-label {
+  font-size: 0.52rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 0 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+/* Dial */
+.dial {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  padding: 11px 13px;
+  transition: border-color 0.2s;
+}
+.dial:hover { border-color: rgba(212,168,67,0.4); }
+.dial-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.dial-name {
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted2);
+}
+.dial-val {
+  font-size: 0.95rem;
+  color: var(--accent);
+  font-weight: 500;
+}
+.dial-val small { font-size: 0.55rem; color: var(--muted2); }
+input[type=range] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: var(--border2);
+  outline: none;
+  cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  background: var(--accent);
+  border-radius: 0;
+  transform: rotate(45deg);
+  box-shadow: 0 0 6px rgba(212,168,67,0.5);
+}
+input[type=range]::-moz-range-thumb {
+  width: 12px; height: 12px;
+  background: var(--accent);
+  border-radius: 0;
+  border: none;
+}
+.dial-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+}
+.dial-ticks span {
+  font-size: 0.48rem;
+  color: var(--muted);
+}
+.dial-hint {
+  font-size: 0.55rem;
+  color: var(--muted2);
+  margin-top: 6px;
+  line-height: 1.55;
+  min-height: 26px;
+  font-style: italic;
+}
+
+/* DOF bar */
+.dof-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+}
+.dof-track {
+  flex: 1;
+  height: 3px;
+  background: rgba(255,255,255,0.06);
+  position: relative;
+}
+.dof-fill {
+  position: absolute;
+  height: 100%;
+  background: var(--accent2);
+  left: 0;
+  transition: width 0.3s;
+}
+.dof-lab { font-size: 0.48rem; color: var(--muted); white-space: nowrap; }
+
+/* Film sim grid */
+.film-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.film-btn {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  padding: 8px 4px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s;
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+}
+.film-btn:hover { border-color: var(--accent2); }
+.film-btn.active {
+  border-color: var(--accent2);
+  background: rgba(107,163,200,0.1);
+  color: var(--accent2);
+}
+.film-btn .fb-name {
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  display: block;
+}
+.film-btn .fb-tag {
+  font-size: 0.48rem;
+  color: var(--muted);
+  display: block;
+  margin-top: 2px;
+}
+.film-btn.active .fb-tag { color: rgba(107,163,200,0.6); }
+
+/* WB selector */
+.wb-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+.wb-btn {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  padding: 7px 4px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.18s;
+  color: var(--muted2);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.54rem;
+  letter-spacing: 0.08em;
+}
+.wb-btn:hover, .wb-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(212,168,67,0.06);
+}
+
+/* Light grid */
+.light-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+.light-btn {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  padding: 9px 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.18s;
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+}
+.light-btn:hover { border-color: var(--accent2); }
+.light-btn.active {
+  border-color: var(--accent2);
+  background: rgba(107,163,200,0.08);
+  color: var(--accent2);
+}
+.light-btn .li { font-size: 1rem; display: block; margin-bottom: 3px; }
+.light-btn .ln { font-size: 0.52rem; letter-spacing: 0.1em; text-transform: uppercase; display: block; }
+
+/* Warning & insight */
+.exp-warn {
+  font-size: 0.55rem;
+  padding: 7px 10px;
+  line-height: 1.5;
+  display: none;
+  border-left: 2px solid;
+}
+.exp-warn.show { display: block; }
+.exp-warn.over { color: var(--red); border-color: var(--red); background: rgba(200,107,107,0.06); }
+.exp-warn.under { color: var(--accent2); border-color: var(--accent2); background: rgba(107,163,200,0.06); }
+
+.insight-box {
+  background: rgba(212,168,67,0.04);
+  border: 1px solid rgba(212,168,67,0.12);
+  padding: 10px 12px;
+}
+.insight-box .it { font-size: 0.52rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
+.insight-box .ib { font-size: 0.57rem; color: var(--muted2); line-height: 1.65; font-style: italic; }
+
+
+/* ══════════════════════════════════════════
+   SECTION 2 — QUIZ
+══════════════════════════════════════════ */
+#sec-quiz {
+  display: none;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 32px;
+  gap: 24px;
+  background: var(--bg);
+}
+#sec-quiz.active { display: flex; }
+
+.quiz-header {
+  text-align: center;
+}
+.quiz-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem;
+  color: var(--accent);
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
+.quiz-sub {
+  font-size: 0.6rem;
+  color: var(--muted2);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+.quiz-scenario {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  padding: 24px 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: center;
+}
+.scenario-visual {
+  height: 180px;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+#quiz-canvas { width: 100%; height: 100%; display: block; }
+
+.scenario-info { }
+.scenario-label {
+  font-size: 0.52rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.scenario-light {
+  font-size: 1.4rem;
+  margin-bottom: 4px;
+}
+.scenario-subject {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.6rem;
+  color: var(--text);
+  font-style: italic;
+  margin-bottom: 8px;
+}
+.scenario-desc {
+  font-size: 0.58rem;
+  color: var(--muted2);
+  line-height: 1.7;
+}
+
+/* Quiz controls */
+.quiz-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.qctrl {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 16px;
+}
+.qctrl-label {
+  font-size: 0.54rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.qctrl-val {
+  font-size: 1.1rem;
+  color: var(--accent);
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+.qctrl-val small { font-size: 0.55rem; color: var(--muted2); }
+
+/* Score panel */
+.quiz-submit-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 12px 28px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.btn-primary:hover { background: #e8c06a; }
+.btn-secondary {
+  background: none;
+  color: var(--muted2);
+  border: 1px solid var(--border2);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 11px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Score result */
+.score-panel {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  padding: 28px;
+  display: none;
+}
+.score-panel.show { display: block; }
+.score-top {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.score-num {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 4rem;
+  line-height: 1;
+  color: var(--accent);
+}
+.score-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted2);
+}
+.score-stars {
+  font-size: 1.4rem;
+  margin-bottom: 16px;
+}
+.score-breakdown {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.score-item {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  padding: 10px;
+  text-align: center;
+}
+.score-item .si-label {
+  font-size: 0.5rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.score-item .si-val {
+  font-size: 0.8rem;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.score-item .si-ideal {
+  font-size: 0.5rem;
+  color: var(--muted);
+}
+.score-item.good { border-color: var(--green); }
+.score-item.bad { border-color: var(--red); }
+.score-item.ok { border-color: var(--accent); }
+.score-item .si-pts {
+  font-size: 0.65rem;
+  font-weight: 500;
+  margin-top: 3px;
+}
+.score-item.good .si-pts { color: var(--green); }
+.score-item.bad .si-pts { color: var(--red); }
+.score-item.ok .si-pts { color: var(--accent); }
+
+.score-explain {
+  font-size: 0.6rem;
+  color: var(--muted2);
+  line-height: 1.75;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.score-explain strong { color: var(--text); font-weight: 500; }
+
+/* Progress */
+.quiz-progress {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.prog-dot {
+  width: 8px; height: 8px;
+  background: var(--border2);
+  border-radius: 50%;
+  transition: background 0.3s;
+}
+.prog-dot.done { background: var(--accent); }
+.prog-dot.current { background: var(--accent2); }
+
+/* Blind mode — hide canvas until submitted */
+.scenario-visual {
+  position: relative;
+}
+.scenario-visual canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.scene-blind {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 10;
+  transition: opacity 0.5s;
+}
+.scene-blind.revealed {
+  opacity: 0;
+  pointer-events: none;
+}
+.blind-icon { font-size: 2rem; opacity: 0.4; }
+.blind-text {
+  font-size: 0.55rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.8;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    Obscura
+    <sub>Camera Simulator · Fuji Edition</sub>
+  </div>
+  <nav class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('sim')">Simulator</button>
+    <button class="tab-btn" onclick="switchTab('quiz')">Quiz</button>
+  </nav>
+</header>
+
+<div class="app-body">
+
+<!-- ══ SIMULATOR SECTION ══ -->
+<section id="sec-sim" class="section active">
+
+  <div class="vf-wrap">
+    <canvas id="main-canvas"></canvas>
+    <div class="film-overlay" id="film-overlay"></div>
+    <div class="grain-overlay" id="grain-overlay"></div>
+    <div class="hud">
+      <div class="hud-c hud-tl"></div>
+      <div class="hud-c hud-tr"></div>
+      <div class="hud-c hud-bl"></div>
+      <div class="hud-c hud-br"></div>
+      <div class="hud-top-left" id="hud-light-label">☀ Direct Sun</div>
+      <div class="hud-top-right" id="hud-film-label">PROVIA</div>
+      <div class="meter-wrap">
+        <span>−2</span>
+        <div class="meter-track">
+          <div class="meter-center-tick"></div>
+          <div class="meter-fill" id="meter-fill"></div>
+        </div>
+        <span>+2</span>
+      </div>
+      <div class="hud-bottom">
+        <span id="h-shutter">1/125s</span>
+        <span id="h-ap">f/8</span>
+        <span id="h-iso">ISO 400</span>
+        <span id="h-focal">50mm</span>
+        <span id="h-wb">AWB</span>
+      </div>
+      <div class="film-badge" id="film-badge">Provia / Standard</div>
+    </div>
+  </div>
+
+  <div class="ctrl-panel">
+    <div class="sec-label">Exposure</div>
+
+    <!-- Shutter -->
+    <div class="dial">
+      <div class="dial-row">
+        <span class="dial-name">Shutter</span>
+        <span class="dial-val" id="v-shutter">1/125<small>s</small></span>
+      </div>
+      <input type="range" id="sl-shutter" min="0" max="9" value="5">
+      <div class="dial-ticks"><span>1s</span><span>1/30</span><span>1/125</span><span>1/500</span><span>1/2000</span></div>
+      <div class="dial-hint" id="hint-shutter">Medium speed — light motion frozen.</div>
+    </div>
+
+    <!-- Aperture -->
+    <div class="dial">
+      <div class="dial-row">
+        <span class="dial-name">Aperture</span>
+        <span class="dial-val" id="v-ap">f/8</span>
+      </div>
+      <input type="range" id="sl-ap" min="0" max="7" value="5">
+      <div class="dial-ticks"><span>f/1.4</span><span>f/2.8</span><span>f/5.6</span><span>f/11</span><span>f/22</span></div>
+      <div class="dial-hint" id="hint-ap">Medium depth of field, background slightly blurred.</div>
+      <div class="dof-row">
+        <span class="dof-lab">Bokeh</span>
+        <div class="dof-track"><div class="dof-fill" id="dof-fill"></div></div>
+        <span class="dof-lab">Sharp</span>
+      </div>
+    </div>
+
+    <!-- ISO -->
+    <div class="dial">
+      <div class="dial-row">
+        <span class="dial-name">ISO</span>
+        <span class="dial-val" id="v-iso">400</span>
+      </div>
+      <input type="range" id="sl-iso" min="0" max="6" value="2">
+      <div class="dial-ticks"><span>100</span><span>400</span><span>1600</span><span>6400</span><span>25600</span></div>
+      <div class="dial-hint" id="hint-iso">Moderate ISO — excellent quality, minimal noise.</div>
+    </div>
+
+    <!-- Focal -->
+    <div class="dial">
+      <div class="dial-row">
+        <span class="dial-name">Focal Length</span>
+        <span class="dial-val" id="v-focal">50<small>mm</small></span>
+      </div>
+      <input type="range" id="sl-focal" min="0" max="6" value="2">
+      <div class="dial-ticks"><span>16mm</span><span>35mm</span><span>85mm</span><span>200mm</span><span>400mm</span></div>
+      <div class="dial-hint" id="hint-focal">Standard — natural perspective, close to human eye.</div>
+    </div>
+
+    <div class="sec-label">Film Simulation · Fuji</div>
+    <div class="film-grid" id="film-grid">
+      <button class="film-btn active" data-film="provia" onclick="setFilm('provia')">
+        <span class="fb-name">Provia</span><span class="fb-tag">Universal</span>
+      </button>
+      <button class="film-btn" data-film="velvia" onclick="setFilm('velvia')">
+        <span class="fb-name">Velvia</span><span class="fb-tag">Landscape</span>
+      </button>
+      <button class="film-btn" data-film="astia" onclick="setFilm('astia')">
+        <span class="fb-name">Astia</span><span class="fb-tag">Portrait</span>
+      </button>
+      <button class="film-btn" data-film="chrome" onclick="setFilm('chrome')">
+        <span class="fb-name">Classic Chrome</span><span class="fb-tag">Street</span>
+      </button>
+      <button class="film-btn" data-film="neg" onclick="setFilm('neg')">
+        <span class="fb-name">Classic Neg</span><span class="fb-tag">Analog</span>
+      </button>
+      <button class="film-btn" data-film="acros" onclick="setFilm('acros')">
+        <span class="fb-name">Acros</span><span class="fb-tag">B&amp;W</span>
+      </button>
+    </div>
+
+    <div class="sec-label">White Balance</div>
+    <div class="wb-grid" id="wb-grid">
+      <button class="wb-btn active" data-wb="auto" onclick="setWB('auto')">AWB</button>
+      <button class="wb-btn" data-wb="daylight" onclick="setWB('daylight')">Daylight</button>
+      <button class="wb-btn" data-wb="cloudy" onclick="setWB('cloudy')">Cloudy</button>
+      <button class="wb-btn" data-wb="shade" onclick="setWB('shade')">Shade</button>
+      <button class="wb-btn" data-wb="tungsten" onclick="setWB('tungsten')">Tungsten</button>
+      <button class="wb-btn" data-wb="fluorescent" onclick="setWB('fluorescent')">Fluor.</button>
+    </div>
+
+    <div class="sec-label">Light Conditions</div>
+    <div class="light-grid">
+      <button class="light-btn active" data-light="sun" onclick="setLight('sun')"><span class="li">☀️</span><span class="ln">Direct Sun</span></button>
+      <button class="light-btn" data-light="cloudy" onclick="setLight('cloudy')"><span class="li">☁️</span><span class="ln">Overcast</span></button>
+      <button class="light-btn" data-light="sunset" onclick="setLight('sunset')"><span class="li">🌅</span><span class="ln">Sunset</span></button>
+      <button class="light-btn" data-light="shadow" onclick="setLight('shadow')"><span class="li">🌑</span><span class="ln">Deep Shadow</span></button>
+      <button class="light-btn" data-light="night" onclick="setLight('night')" style="grid-column:span 2"><span class="li">🌃</span><span class="ln">Artificial Night</span></button>
+    </div>
+
+    <div class="exp-warn" id="exp-warn"></div>
+    <div class="insight-box">
+      <div class="it">💡 Fuji Insight</div>
+      <div class="ib" id="insight-txt">Adjust the parameters to explore the scene. Try combining Film Simulation with different light conditions.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ QUIZ SECTION ══ -->
+<section id="sec-quiz" class="section">
+  <div class="quiz-header">
+    <div class="quiz-title">Proving Ground</div>
+    <div class="quiz-sub">Choose the right settings for each scenario</div>
+  </div>
+
+  <div class="quiz-progress" id="quiz-progress"></div>
+
+  <div class="quiz-scenario">
+    <div class="scenario-visual">
+      <canvas id="quiz-canvas"></canvas>
+      <div class="scene-blind" id="scene-blind">
+        <div class="blind-icon">🎯</div>
+        <div class="blind-text">Select your settings<br>then press Evaluate</div>
+      </div>
+    </div>
+    <div class="scenario-info">
+      <div class="scenario-label">Scenario #<span id="q-num">1</span> of <span id="q-total">8</span></div>
+      <div class="scenario-light" id="q-light-icon">☀️</div>
+      <div class="scenario-subject" id="q-subject">Environmental Portrait</div>
+      <div class="scenario-desc" id="q-desc">Subject standing outdoors, direct sunlight from behind. You want to separate the subject from the background with bokeh, keeping the face well exposed.</div>
+    </div>
+  </div>
+
+  <div class="quiz-controls">
+    <div class="qctrl">
+      <div class="qctrl-label">Shutter</div>
+      <div class="qctrl-val" id="qv-shutter">1/125<small>s</small></div>
+      <input type="range" id="qsl-shutter" min="0" max="9" value="5">
+      <div class="dial-ticks"><span>1s</span><span>1/30</span><span>1/125</span><span>1/500</span><span>1/2000</span></div>
+    </div>
+    <div class="qctrl">
+      <div class="qctrl-label">Aperture</div>
+      <div class="qctrl-val" id="qv-ap">f/8</div>
+      <input type="range" id="qsl-ap" min="0" max="7" value="5">
+      <div class="dial-ticks"><span>f/1.4</span><span>f/2.8</span><span>f/5.6</span><span>f/11</span><span>f/22</span></div>
+    </div>
+    <div class="qctrl">
+      <div class="qctrl-label">ISO</div>
+      <div class="qctrl-val" id="qv-iso">400</div>
+      <input type="range" id="qsl-iso" min="0" max="6" value="2">
+      <div class="dial-ticks"><span>100</span><span>400</span><span>1600</span><span>6400</span><span>25600</span></div>
+    </div>
+    <div class="qctrl">
+      <div class="qctrl-label">Focal Length</div>
+      <div class="qctrl-val" id="qv-focal">50<small>mm</small></div>
+      <input type="range" id="qsl-focal" min="0" max="6" value="2">
+      <div class="dial-ticks"><span>16mm</span><span>35mm</span><span>85mm</span><span>200mm</span><span>400mm</span></div>
+    </div>
+  </div>
+
+  <div class="quiz-submit-row">
+    <button class="btn-primary" onclick="submitQuiz()">Evaluate →</button>
+    <button class="btn-secondary" onclick="nextScenario()">Skip ↓</button>
+  </div>
+
+  <div class="score-panel" id="score-panel">
+    <div class="score-top">
+      <div class="score-num" id="score-num">72</div>
+      <div>
+        <div class="score-label">Score</div>
+        <div class="score-stars" id="score-stars">⭐⭐⭐</div>
+      </div>
+    </div>
+    <div class="score-breakdown" id="score-breakdown"></div>
+    <div class="score-explain" id="score-explain"></div>
+    <div style="margin-top:16px">
+      <button class="btn-primary" onclick="nextScenario()">Next scenario →</button>
+    </div>
+  </div>
+</section>
+
+</div><!-- app-body -->
+
+<script>
+// ══════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════
+const SHUTTERS = [
+  {val:1,      label:'1s',       ev:4,   blur:1.0},
+  {val:1/4,    label:'1/4s',     ev:2,   blur:0.78},
+  {val:1/15,   label:'1/15s',    ev:1,   blur:0.58},
+  {val:1/30,   label:'1/30s',    ev:0,   blur:0.42},
+  {val:1/60,   label:'1/60s',    ev:-0.5,blur:0.25},
+  {val:1/125,  label:'1/125s',   ev:-1,  blur:0.1},
+  {val:1/250,  label:'1/250s',   ev:-1.5,blur:0},
+  {val:1/500,  label:'1/500s',   ev:-2,  blur:0},
+  {val:1/1000, label:'1/1000s',  ev:-2.5,blur:0},
+  {val:1/2000, label:'1/2000s',  ev:-3,  blur:0},
+];
+const SHUTTER_HINTS = [
+  'Very long exposure — light trails, silky waterfalls. Tripod required.',
+  'Very slow — strong creative motion blur. Tripod needed.',
+  'Slow — handheld limit. Motion blur risk on moving subjects.',
+  'Minimum limit — slight risk of camera shake.',
+  'Safe for slow subjects. Minimum for walking.',
+  'Medium speed — light motion frozen.',
+  'Fast — freezes amateur sports and children.',
+  'Very fast — freezes running and cycling.',
+  'Ultra fast — splashes, objects in flight.',
+  'Extreme — athletics, fast wildlife.',
+];
+const APERTURES = [
+  {f:1.4, label:'f/1.4', ev:3,   blur:1.0},
+  {f:2,   label:'f/2',   ev:2.5, blur:0.86},
+  {f:2.8, label:'f/2.8', ev:2,   blur:0.70},
+  {f:4,   label:'f/4',   ev:1.5, blur:0.52},
+  {f:5.6, label:'f/5.6', ev:1,   blur:0.35},
+  {f:8,   label:'f/8',   ev:0,   blur:0.18},
+  {f:11,  label:'f/11',  ev:-1,  blur:0.06},
+  {f:22,  label:'f/22',  ev:-2,  blur:0},
+];
+const AP_HINTS = [
+  'Maximum aperture — extreme bokeh, critical focus to the mm.',
+  'Very open — pronounced bokeh. Great for portraits in low light.',
+  'Open — soft background, subject-background separation.',
+  'Medium-open — bokeh on nearby subjects, versatile.',
+  'Medium — balanced depth of field. Documentary standard.',
+  'Medium depth of field — background slight blur, good sharpness.',
+  'High depth of field — landscapes, architecture, HDR.',
+  'Maximum depth — everything in focus. Diffraction risk beyond f/11.',
+];
+const ISOS = [
+  {val:100,   label:'100',   ev:-3, noise:0},
+  {val:200,   label:'200',   ev:-2, noise:0.04},
+  {val:400,   label:'400',   ev:-1, noise:0.12},
+  {val:800,   label:'800',   ev:0,  noise:0.22},
+  {val:1600,  label:'1600',  ev:1,  noise:0.38},
+  {val:3200,  label:'3200',  ev:2,  noise:0.58},
+  {val:6400,  label:'6400',  ev:3,  noise:0.82},
+];
+const ISO_HINTS = [
+  'Base ISO — maximum quality, requires lots of light. Daytime landscapes.',
+  'Low — excellent quality. Standard for daylight.',
+  'Moderate ISO — great quality, minimal noise.',
+  'Medium — slight grain, acceptable in print.',
+  'High — visible noise. Indoors/evening without flash.',
+  'Very high — heavy grain. Only if necessary.',
+  'Extreme — quality degraded. Last resort.',
+];
+const FOCALS = [
+  {mm:16,  label:'16mm',  zoom:0.44},
+  {mm:24,  label:'24mm',  zoom:0.60},
+  {mm:50,  label:'50mm',  zoom:0.85},
+  {mm:85,  label:'85mm',  zoom:1.12},
+  {mm:135, label:'135mm', zoom:1.55},
+  {mm:200, label:'200mm', zoom:2.05},
+  {mm:400, label:'400mm', zoom:3.30},
+];
+const FOCAL_HINTS = [
+  'Extreme wide angle — strong distortion, maximum field of view. Interiors, dramatic landscapes.',
+  'Wide angle — broad perspective, slight distortion. Reportage, architecture.',
+  'Standard — natural perspective, close to human eye.',
+  'Portrait — flattering compression for faces. The classic.',
+  'Medium telephoto — pronounced perspective compression.',
+  'Telephoto — strong subject isolation.',
+  'Super-telephoto — wildlife, sports at extreme distance.',
+];
+
+const LIGHTS = {
+  sun:    {name:'Direct Sun',        icon:'☀',  ev:2,   sky:['#3a80e0','#5aaaf8','#8ed0ff'], horizon:'#ffe4a0', ground:'#c09050', ambMult:1.0, colorTemp:[1.0,0.97,0.82]},
+  cloudy: {name:'Overcast',          icon:'☁',  ev:0,   sky:['#7888a0','#99aabb','#bbc8d4'], horizon:'#d8dce0', ground:'#7a7d80', ambMult:0.65,colorTemp:[0.84,0.90,1.0]},
+  sunset: {name:'Sunset',            icon:'🌅', ev:-2,  sky:['#18183c','#7a284c','#f05020'], horizon:'#ff8810', ground:'#60382a', ambMult:0.5, colorTemp:[1.0,0.58,0.18]},
+  shadow: {name:'Deep Shadow',       icon:'🌑', ev:-3,  sky:['#181c28','#222838','#2e3848'], horizon:'#384858', ground:'#282e38', ambMult:0.25,colorTemp:[0.60,0.70,1.0]},
+  night:  {name:'Artificial Night',  icon:'🌃', ev:-4,  sky:['#04040e','#07071a','#090924'], horizon:'#0e0e2a', ground:'#141414', ambMult:0.1, colorTemp:[1.0,0.72,0.18]},
+};
+
+// Film Simulations — LUT-style as CSS filter + overlay
+const FILMS = {
+  provia:  {name:'Provia / Standard', filter:'saturate(1.0) contrast(1.0) brightness(1.0)', overlay:'rgba(0,0,0,0)',      grain:0,    desc:'Balanced, universal. True-to-life colors.'},
+  velvia:  {name:'Velvia / Vivid',    filter:'saturate(1.65) contrast(1.15) brightness(0.97)', overlay:'rgba(0,20,40,0.06)', grain:0.05, desc:'Intense saturation. Landscapes, nature.'},
+  astia:   {name:'Astia / Soft',      filter:'saturate(0.82) contrast(0.9) brightness(1.06)',  overlay:'rgba(255,200,180,0.07)', grain:0, desc:'Soft, pastel tones. Female portraits.'},
+  chrome:  {name:'Classic Chrome',    filter:'saturate(0.72) contrast(1.08) brightness(0.95)', overlay:'rgba(20,30,10,0.1)',  grain:0.1,  desc:'Desaturated, high contrast. Street, documentary.'},
+  neg:     {name:'Classic Neg',       filter:'saturate(0.88) contrast(0.95) brightness(0.92)', overlay:'rgba(40,20,0,0.12)', grain:0.18, desc:'Warm analog tone. Narrative, fashion.'},
+  acros:   {name:'Acros B&W',         filter:'saturate(0) contrast(1.18) brightness(1.0)',      overlay:'rgba(0,0,0,0)',      grain:0.22, desc:'High-contrast black and white. Photojournalism.'},
+};
+
+// White Balance — shifts color temperature
+const WBS = {
+  auto:        {name:'AWB',        shift:[0,0,0]},
+  daylight:    {name:'Daylight',   shift:[15,5,-20]},
+  cloudy:      {name:'Cloudy',     shift:[25,8,-30]},
+  shade:       {name:'Shade',      shift:[40,12,-50]},
+  tungsten:    {name:'Tungsten',   shift:[-80,-20,60]},
+  fluorescent: {name:'Fluor.',     shift:[-30,10,40]},
+};
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let S = {
+  shutterIdx:5, apertureIdx:5, isoIdx:2, focalIdx:2,
+  light:'sun', film:'provia', wb:'auto',
+};
+
+// ══════════════════════════════════════════
+// CANVAS
+// ══════════════════════════════════════════
+const canvas = document.getElementById('main-canvas');
+const ctx    = canvas.getContext('2d');
+
+function resize() {
+  const wrap = canvas.parentElement;
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  if (w && h) { canvas.width = w; canvas.height = h; drawScene(ctx, canvas.width, canvas.height, S); }
+}
+window.addEventListener('resize', resize);
+setTimeout(resize, 80);
+
+// ══════════════════════════════════════════
+// SCENE DRAWING
+// ══════════════════════════════════════════
+function lerp(a,b,t){return a+(b-a)*t;}
+function hexRgb(h){const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);return r?[parseInt(r[1],16),parseInt(r[2],16),parseInt(r[3],16)]:[0,0,0];}
+function rgbHex(r,g,b){return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');}
+function tint(hex, ct, expMult, ambMult=1){
+  let [r,g,b]=hexRgb(hex);
+  return rgbHex(r*ct[0]*expMult*ambMult, g*ct[1]*expMult*ambMult, b*ct[2]*expMult*ambMult);
+}
+
+function drawScene(c, W, H, st) {
+  if (!W||!H) return;
+  c.clearRect(0,0,W,H);
+
+  const light = LIGHTS[st.light];
+  const ap    = APERTURES[st.apertureIdx];
+  const sh    = SHUTTERS[st.shutterIdx];
+  const iso   = ISOS[st.isoIdx];
+  const focal = FOCALS[st.focalIdx];
+  const wb    = WBS[st.wb];
+
+  // WB color temp adjustment
+  const wbShift = wb.shift;
+  const ct = [
+    light.colorTemp[0] + wbShift[0]/255,
+    light.colorTemp[1] + wbShift[1]/255,
+    light.colorTemp[2] + wbShift[2]/255,
+  ];
+
+  const totalEV = light.ev + sh.ev + ap.ev + iso.ev;
+  const expMult = Math.pow(2, totalEV * 0.45);
+  const zoom    = focal.zoom;
+  const horizY  = H * (0.40 + (zoom - 0.85) * 0.04);
+
+  // SKY
+  const skyG = c.createLinearGradient(0,0,0,horizY);
+  // Sun: deep blue top, stays blue to horizon — no orange wash at horizon
+  if(st.light === 'sun') {
+    skyG.addColorStop(0,   tint(light.sky[0], ct, expMult));
+    skyG.addColorStop(0.7, tint(light.sky[1], ct, expMult));
+    skyG.addColorStop(1,   tint(light.sky[1], ct, expMult)); // no horizon glow
+  } else {
+    skyG.addColorStop(0,   tint(light.sky[0], ct, expMult));
+    skyG.addColorStop(0.55,tint(light.sky[1], ct, expMult));
+    skyG.addColorStop(1,   tint(light.sky[2], ct, expMult));
+  }
+  c.fillStyle = skyG; c.fillRect(0,0,W,horizY);
+
+  // Sun
+  if (st.light === 'sun') {
+    const sx=W*0.74, sy=horizY*0.22;
+    const sg=c.createRadialGradient(sx,sy,0,sx,sy,50);
+    sg.addColorStop(0,'rgba(255,255,210,0.95)');
+    sg.addColorStop(0.25,'rgba(255,220,100,0.55)');
+    sg.addColorStop(1,'rgba(255,180,40,0)');
+    c.fillStyle=sg; c.fillRect(0,0,W,horizY);
+  }
+  // Sunset glow
+  if (st.light === 'sunset') {
+    const gx=W*0.62, gy=horizY;
+    const gg=c.createRadialGradient(gx,gy,0,gx,gy,H*0.45);
+    gg.addColorStop(0,'rgba(255,180,40,0.65)');
+    gg.addColorStop(0.45,'rgba(240,80,20,0.22)');
+    gg.addColorStop(1,'rgba(0,0,0,0)');
+    c.fillStyle=gg; c.fillRect(0,0,W,H);
+  }
+  // Clouds
+  if (st.light === 'cloudy') {
+    for(let i=0;i<6;i++){
+      const cx=W*(0.08+i*0.16), cy=horizY*(0.18+i*0.1), cr=38+i*12;
+      const cg=c.createRadialGradient(cx,cy,0,cx,cy,cr);
+      cg.addColorStop(0,'rgba(210,218,228,0.68)');
+      cg.addColorStop(1,'rgba(180,195,210,0)');
+      c.fillStyle=cg;
+      c.beginPath(); c.ellipse(cx,cy,cr*1.9,cr,0,0,Math.PI*2); c.fill();
+    }
+  }
+  // Stars (night/shadow)
+  if (st.light === 'night' || st.light === 'shadow') {
+    for(let i=0;i<90;i++){
+      const sx=(Math.sin(i*137.5)*0.5+0.5)*W;
+      const sy=(Math.sin(i*79.1)*0.5+0.5)*horizY*0.9;
+      c.fillStyle=`rgba(255,255,255,${0.2+Math.abs(Math.sin(i))*0.4})`;
+      c.beginPath(); c.arc(sx,sy,Math.random()<0.3?1:0.5,0,Math.PI*2); c.fill();
+    }
+  }
+  // Moon
+  if (st.light === 'night') {
+    c.fillStyle='rgba(230,235,220,0.9)';
+    c.beginPath(); c.arc(W*0.25, horizY*0.2, 12, 0, Math.PI*2); c.fill();
+  }
+
+  // GROUND
+  const gG=c.createLinearGradient(0,horizY,0,H);
+  if(st.light === 'sun') {
+    // Sun: ground uniformly lit, no bright horizon band — slight darkening at bottom (shadow)
+    gG.addColorStop(0,   tint(light.ground, ct, expMult, light.ambMult));
+    gG.addColorStop(0.5, tint(light.ground, ct, expMult, light.ambMult));
+    gG.addColorStop(1,   tint(light.ground, ct, expMult*0.82, light.ambMult));
+  } else {
+    gG.addColorStop(0, tint(light.horizon,ct,expMult));
+    gG.addColorStop(0.08, tint(light.ground,ct,expMult,light.ambMult));
+    gG.addColorStop(1, tint(light.ground,ct,expMult*0.7,light.ambMult));
+  }
+  c.fillStyle=gG; c.fillRect(0,horizY,W,H-horizY);
+
+  // Perspective grid
+  c.strokeStyle='rgba(255,255,255,0.03)'; c.lineWidth=1;
+  const vp={x:W/2,y:horizY};
+  for(let g=-10;g<=10;g++){
+    const gx=W*0.5+g*W*0.075;
+    c.beginPath(); c.moveTo(vp.x,vp.y); c.lineTo(gx,H); c.stroke();
+  }
+  for(let row=1;row<=7;row++){
+    const gy=horizY+(H-horizY)*Math.pow(row/7,1.6);
+    const p=(gy-horizY)/(H-horizY);
+    c.beginPath(); c.moveTo(vp.x-W*0.5*p,gy); c.lineTo(vp.x+W*0.5*p,gy); c.stroke();
+  }
+
+  // BUILDINGS
+  const bgBlur = ap.blur * (0.8 + (zoom-0.85)*0.25);
+  const bldgs=[
+    {x:0.04,w:0.11,h:0.30,col:'#233040'},{x:0.13,w:0.07,h:0.38,col:'#1a2535'},
+    {x:0.19,w:0.09,h:0.24,col:'#1e2c3c'},{x:0.58,w:0.08,h:0.32,col:'#1c2838'},
+    {x:0.66,w:0.12,h:0.40,col:'#22303e'},{x:0.78,w:0.07,h:0.26,col:'#182430'},
+    {x:0.86,w:0.09,h:0.22,col:'#1e2a38'},
+  ];
+
+  bldgs.forEach(b => {
+    const bx=b.x*W*(1/zoom)+(W-W/zoom)*0.5;
+    const bw=b.w*W*(1/zoom);
+    const top=horizY-b.h*H*0.52;
+    const rgb=hexRgb(b.col);
+    const tr=rgb.map(v=>Math.min(255,v*ct[0]*expMult*light.ambMult*0.8));
+    c.fillStyle=rgbHex(...tr);
+    c.fillRect(bx,top,bw,horizY-top);
+    // Windows lit at night
+    if(st.light==='night'||st.light==='shadow'){
+      const rows=5,cols=3;
+      for(let r=0;r<rows;r++){
+        for(let cl=0;cl<cols;cl++){
+          if(Math.sin(b.x*111+r*9+cl*4)>0.05){
+            c.fillStyle=`rgba(255,220,140,${0.5+Math.sin(b.x*50+r)*0.3})`;
+            const wx=bx+cl*bw/cols+2, wy=top+r*(horizY-top)/rows+4;
+            c.fillRect(wx,wy,bw/cols-4,(horizY-top)/rows-6);
+          }
+        }
+      }
+    }
+  });
+
+  // BG blur simulation
+  if(bgBlur>0.1){
+    c.save(); c.filter=`blur(${bgBlur*22}px)`; c.globalAlpha=bgBlur*0.80;
+    bldgs.forEach(b=>{
+      const bx=b.x*W*(1/zoom)+(W-W/zoom)*0.5;
+      const bw=b.w*W*(1/zoom); const top=horizY-b.h*H*0.52;
+      c.fillStyle=tint(b.col,ct,expMult,light.ambMult*0.8);
+      c.fillRect(bx,top,bw,horizY-top);
+    });
+    c.restore();
+  }
+
+  // TREES (midground)
+  const treeMidBlur=bgBlur*0.55;
+  c.save(); if(treeMidBlur>0.08) c.filter=`blur(${treeMidBlur*14}px)`;
+  [0.06,0.15,0.76,0.86,0.93].forEach((tx,i)=>{
+    const trx=tx*W, trH=55+i*12, base=horizY+15+i*4, lr=20+i*6;
+    // Tree shadow on ground (sun only) — short, directly to one side
+    if(st.light==='sun'){
+      c.save(); c.globalAlpha=0.18;
+      c.fillStyle='#000';
+      c.beginPath();
+      c.ellipse(trx+lr*0.6, base+4, lr*1.2, lr*0.22, -0.2, 0, Math.PI*2);
+      c.fill(); c.restore();
+    }
+    const trgb=[30,72,30].map(v=>Math.min(255,v*ct[1]*expMult*light.ambMult));
+    c.fillStyle=rgbHex(...trgb);
+    c.fillRect(trx-3,base-trH,6,trH);
+    const lrgb=[25,95,28].map(v=>Math.min(255,v*ct[1]*expMult*light.ambMult));
+    c.fillStyle=rgbHex(...lrgb);
+    c.beginPath(); c.arc(trx,base-trH,lr,0,Math.PI*2); c.fill();
+  });
+  c.restore();
+
+  // STREET LAMPS (night)
+  if(st.light==='night'){
+    [0.18,0.82].forEach(lp=>{
+      const lx=lp*W, ly=horizY+(H-horizY)*0.08;
+      const lg=c.createRadialGradient(lx,ly,0,lx,ly,H*0.28);
+      lg.addColorStop(0,'rgba(255,195,70,0.38)');
+      lg.addColorStop(0.5,'rgba(255,140,30,0.08)');
+      lg.addColorStop(1,'rgba(0,0,0,0)');
+      c.fillStyle=lg; c.fillRect(0,0,W,H);
+      c.fillStyle='#2a2a2a'; c.fillRect(lx-2,ly,4,H-ly);
+      c.fillStyle='#ffdd77'; c.beginPath(); c.arc(lx,ly,7,0,Math.PI*2); c.fill();
+    });
+  }
+
+  // SUBJECT (person)
+  const subX=W*0.5, subBot=H*0.87, sc=zoom;
+  const figH=105*sc, figW=26*sc;
+
+  // Shadow: sun = short tight ellipse directly below feet; other lights = wider softer
+  c.save();
+  if(st.light==='sun'){
+    // Short hard shadow directly under feet — sun overhead
+    c.globalAlpha=0.55;
+    c.fillStyle='#000';
+    c.beginPath(); c.ellipse(subX+figW*0.3, subBot+3, figW*0.55, figW*0.15, 0, 0, Math.PI*2); c.fill();
+  } else {
+    c.globalAlpha=0.28*light.ambMult;
+    c.fillStyle='#000';
+    c.beginPath(); c.ellipse(subX,subBot+4,figW*0.75,7*sc,0,0,Math.PI*2); c.fill();
+  }
+  c.restore();
+
+  // Body — sun: brighter lit (top-down), other lights: ambient
+  const sunBoost = st.light==='sun' ? 1.35 : 1.0;
+  const brgb=[55,75,95].map(v=>Math.min(255,v*ct[0]*expMult*sunBoost));
+  c.fillStyle=rgbHex(...brgb);
+  c.fillRect(subX-figW/2, subBot-figH*0.62, figW, figH*0.38);
+  c.fillRect(subX-figW*0.38, subBot-figH*0.24, figW*0.33, figH*0.24);
+  c.fillRect(subX+figW*0.05, subBot-figH*0.24, figW*0.33, figH*0.24);
+
+  // Head — sun: strong top light
+  const hBoost = st.light==='sun' ? 1.4 : 1.0;
+  const hrgb=[195,155,125].map(v=>Math.min(255,v*ct[0]*expMult*hBoost));
+  c.fillStyle=rgbHex(...hrgb);
+  c.beginPath(); c.arc(subX, subBot-figH*0.76, figW*0.4, 0, Math.PI*2); c.fill();
+
+  // Sun: add a subtle top highlight to simulate harsh overhead light
+  if(st.light==='sun'){
+    const hlG=c.createRadialGradient(subX, subBot-figH*0.85, 0, subX, subBot-figH*0.6, figH*0.5);
+    hlG.addColorStop(0,'rgba(255,245,200,0.22)');
+    hlG.addColorStop(1,'rgba(255,245,200,0)');
+    c.fillStyle=hlG;
+    c.fillRect(subX-figW, subBot-figH, figW*2, figH);
+  }
+
+  // EXPOSURE overlays
+  if(totalEV>2.5){
+    const blown=Math.min(1,(totalEV-2.5)/2);
+    c.fillStyle=`rgba(255,255,255,${blown*0.88})`; c.fillRect(0,0,W,H);
+  } else if(totalEV<-3.5){
+    const dark=Math.min(1,(-totalEV-3.5)/2);
+    c.fillStyle=`rgba(0,0,0,${dark*0.88})`; c.fillRect(0,0,W,H);
+  }
+
+  // VIGNETTE
+  const vigR=Math.max(W,H)*0.78;
+  const vig=c.createRadialGradient(W/2,H/2,vigR*0.38,W/2,H/2,vigR);
+  const vs=0.28+(1-light.ambMult)*0.28+ap.blur*0.18;
+  vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,`rgba(0,0,0,${vs})`);
+  c.fillStyle=vig; c.fillRect(0,0,W,H);
+
+  // Update overlays & HUD
+  if(c === ctx) updateUI(totalEV, ap, sh, iso, focal, light, bgBlur);
+}
+
+function updateUI(ev, ap, sh, iso, focal, light, bgBlur){
+  const film = FILMS[S.film];
+
+  // Apply film simulation directly on the canvas via CSS filter
+  // Combine with motion blur if needed
+  const motionBlur = sh.blur > 0.3 ? `blur(${sh.blur*3.5}px)` : '';
+  canvas.style.filter = [film.filter, motionBlur].filter(Boolean).join(' ');
+
+  // Film color overlay (warm/cool tint) — keep overlay for color cast only, no filter
+  const fo = document.getElementById('film-overlay');
+  fo.style.filter = 'none';
+  fo.style.background = film.overlay;
+  fo.style.mixBlendMode = 'multiply';
+  fo.style.pointerEvents = 'none';
+
+  // Grain
+  const grainAmt = Math.max(ISOS[S.isoIdx].noise, film.grain);
+  document.getElementById('grain-overlay').style.opacity = grainAmt * 0.88;
+
+  // DOF
+  document.getElementById('dof-fill').style.width = (ap.blur*100)+'%';
+
+  // HUD
+  document.getElementById('h-shutter').textContent = sh.label;
+  document.getElementById('h-ap').textContent = ap.label;
+  document.getElementById('h-iso').textContent = 'ISO '+iso.label;
+  document.getElementById('h-focal').textContent = focal.label;
+  document.getElementById('h-wb').textContent = WBS[S.wb].name;
+  document.getElementById('hud-light-label').textContent = light.icon+' '+light.name;
+  document.getElementById('hud-film-label').textContent = FILMS[S.film].name.split('/')[0].trim().toUpperCase();
+  document.getElementById('film-badge').textContent = FILMS[S.film].name;
+
+  // Meter
+  const mVal=Math.max(-2,Math.min(2,ev));
+  const fill=document.getElementById('meter-fill');
+  const mW=Math.abs(mVal/2)*50;
+  if(mVal>=0){
+    fill.style.left='50%'; fill.style.right='auto'; fill.style.width=mW+'px';
+    fill.style.background=mVal>1.5?'#c86b6b':'#d4a843';
+  } else {
+    fill.style.right='50%'; fill.style.left='auto'; fill.style.width=mW+'px';
+    fill.style.background=mVal<-1.5?'#6ba3c8':'#d4a843';
+  }
+
+  // Warning
+  const warn=document.getElementById('exp-warn');
+  if(ev>2.2){warn.className='exp-warn show over';warn.textContent='⚠ Overexposed — reduce shutter time or close aperture';}
+  else if(ev<-3.2){warn.className='exp-warn show under';warn.textContent='⚠ Underexposed — raise ISO, open aperture or slow down shutter';}
+  else if(sh.blur>0.3){warn.className='exp-warn show under';warn.textContent='⚠ Motion blur risk — use a tripod or brace the camera';}
+  else{warn.className='exp-warn';}
+
+  // Insight
+  let tips=[];
+  if(S.film==='velvia'&&(S.light==='sunset'||S.light==='sun')) tips.push('Velvia + warm light = explosive saturation. Perfect for landscapes, but watch out for skin tones.');
+  else if(S.film==='chrome'&&S.light==='cloudy') tips.push('Classic Chrome in flat light produces that desaturated documentary look. Ideal for street.');
+  else if(S.film==='acros') tips.push('Acros adds silver halide grain simulation. The simulated filter changes with focal length and light.');
+  else if(S.film==='astia'&&ap.f<=2.8) tips.push('Astia + wide aperture = portraits with delicate tones and soft bokeh. The classic Fuji combination.');
+  else if(S.film==='neg') tips.push('Classic Neg compresses shadows in an analog way — great for hard light and high contrast.');
+  if(focal.mm<=24&&S.shutterIdx<=3) tips.push('With wide angle, long shutter speeds are more manageable: the 1/focal rule is more forgiving here.');
+  if(focal.mm>=85&&S.shutterIdx>=4) tips.push('With this telephoto, use at least 1/'+focal.mm+'s to avoid camera shake.')
+  if(S.wb==='tungsten'&&(S.light==='sun'||S.light==='cloudy')) tips.push('Tungsten WB in daylight shifts everything blue. Creative effect, not a mistake.');
+  if(S.wb==='shade'&&S.light==='sunset') tips.push('Shade WB amplifies the warm tones of sunset. Dramatic effect.');
+  if(!tips.length) tips.push(FILMS[S.film].desc+' · '+WBS[S.wb].name+': color temperature balanced for this light.');
+  document.getElementById('insight-txt').textContent=tips[0];
+}
+
+// ══════════════════════════════════════════
+// SIM CONTROLS
+// ══════════════════════════════════════════
+function setLight(l){
+  S.light=l;
+  document.querySelectorAll('.light-btn').forEach(b=>b.classList.toggle('active',b.dataset.light===l));
+  draw();
+}
+function setFilm(f){
+  S.film=f;
+  document.querySelectorAll('.film-btn').forEach(b=>b.classList.toggle('active',b.dataset.film===f));
+  draw();
+}
+function setWB(w){
+  S.wb=w;
+  document.querySelectorAll('.wb-btn').forEach(b=>b.classList.toggle('active',b.dataset.wb===w));
+  draw();
+}
+function draw(){ drawScene(ctx,canvas.width,canvas.height,S); }
+
+// Shutter
+document.getElementById('sl-shutter').addEventListener('input',e=>{
+  S.shutterIdx=+e.target.value;
+  document.getElementById('v-shutter').innerHTML=SHUTTERS[S.shutterIdx].label.replace('s','<small>s</small>');
+  document.getElementById('hint-shutter').textContent=SHUTTER_HINTS[S.shutterIdx];
+  draw();
+});
+// Aperture
+document.getElementById('sl-ap').addEventListener('input',e=>{
+  S.apertureIdx=+e.target.value;
+  document.getElementById('v-ap').textContent=APERTURES[S.apertureIdx].label;
+  document.getElementById('hint-ap').textContent=AP_HINTS[S.apertureIdx];
+  draw();
+});
+// ISO
+document.getElementById('sl-iso').addEventListener('input',e=>{
+  S.isoIdx=+e.target.value;
+  document.getElementById('v-iso').textContent=ISOS[S.isoIdx].label;
+  document.getElementById('hint-iso').textContent=ISO_HINTS[S.isoIdx];
+  draw();
+});
+// Focal
+document.getElementById('sl-focal').addEventListener('input',e=>{
+  S.focalIdx=+e.target.value;
+  document.getElementById('v-focal').innerHTML=FOCALS[S.focalIdx].label.replace('mm','<small>mm</small>');
+  document.getElementById('hint-focal').textContent=FOCAL_HINTS[S.focalIdx];
+  draw();
+});
+
+// ══════════════════════════════════════════
+// QUIZ ENGINE
+// ══════════════════════════════════════════
+
+function calcEV(shutterIdx, apertureIdx, isoIdx, light) {
+  return LIGHTS[light].ev + SHUTTERS[shutterIdx].ev + APERTURES[apertureIdx].ev + ISOS[isoIdx].ev;
+}
+
+const SCENARIOS = [
+  {
+    light:'sun', subject:'Portrait with Bokeh', icon:'☀️',
+    desc:'Subject outdoors in full sun. You want to separate the subject from the background with bokeh, keeping the face well exposed.',
+    // sun(2) + 1/250s(-1.5) + f/2(+2.5) + ISO100(-3) = EV 0 ✓
+    ideal:{shutterIdx:6, apertureIdx:1, isoIdx:0, focalIdx:3},
+    explain:'In full sun, f/2 gives beautiful bokeh on an 85mm. ISO 100 for maximum quality. 1/250s balances the wide aperture keeping EV=0. The wide-open aperture at 85mm fully separates the subject from the background.',
+  },
+  {
+    light:'cloudy', subject:'Street Photography', icon:'☁️',
+    desc:'City street, overcast sky, people walking. Wide field of view, sharp subjects.',
+    // cloudy(0) + 1/60s(-0.5) + f/5.6(+1) + ISO400(-1) = EV -0.5 ✓
+    ideal:{shutterIdx:4, apertureIdx:4, isoIdx:2, focalIdx:1},
+    explain:'Diffuse overcast light: ISO 400 is sufficient with f/5.6. 1/60s freezes slow-moving pedestrians. f/5.6 gives enough depth of field to capture a scene with multiple subjects. 24mm is the classic wide angle for street photography.',
+  },
+  {
+    light:'sunset', subject:'Sunset Landscape', icon:'🌅',
+    desc:'Open landscape, fiery sky. Everything in focus, maximum quality. You have a tripod.',
+    // sunset(-2) + 1/15s(+1) + f/5.6(+1) + ISO800(0) = EV 0 ✓
+    ideal:{shutterIdx:2, apertureIdx:4, isoIdx:3, focalIdx:1},
+    explain:'With a tripod at sunset: ISO 800 compensates for fading light. f/5.6 ensures sharpness from foreground to horizon. 1/15s is safe on a tripod and balances the exposure. EV=0: perfect exposure that preserves sky highlight detail.',
+  },
+  {
+    light:'shadow', subject:'Portrait in Shadow', icon:'🌑',
+    desc:'Subject in a low-light interior. You want sharp face, bokeh on background, no flash.',
+    // shadow(-3) + 1/15s(+1) + f/2(+2.5) + ISO800(0) = EV +0.5 ✓
+    ideal:{shutterIdx:2, apertureIdx:1, isoIdx:3, focalIdx:3},
+    explain:'In deep shadow: f/2 maximizes light and creates beautiful bokeh on 85mm. ISO 800 is the quality/sensitivity sweet spot. 1/15s is viable on 85mm with good technique. EV≈+0.5: slight overexposure recovers shadow detail in the face.',
+  },
+  {
+    light:'night', subject:'Night Street', icon:'🌃',
+    desc:'Night street photography, streetlamps and neon. No tripod, stationary subjects.',
+    // night(-4) + 1/125s(-1) + f/1.4(+3) + ISO3200(+2) = EV 0 ✓
+    ideal:{shutterIdx:5, apertureIdx:0, isoIdx:5, focalIdx:1},
+    explain:'At night without a tripod: f/1.4 maximizes light intake. ISO 3200 provides necessary sensitivity. 1/125s is safe to avoid camera shake on 24mm and keeps EV=0. The combination of extreme aperture and high ISO is the classic night street recipe.',
+  },
+  {
+    light:'sun', subject:'Sports Action', icon:'☀️',
+    desc:'Athlete running, full sun. Freeze movement completely.',
+    // sun(2) + 1/1000s(-2.5) + f/4(+1.5) + ISO400(-1) = EV 0 ✓
+    ideal:{shutterIdx:8, apertureIdx:3, isoIdx:2, focalIdx:4},
+    explain:'To freeze fast action you need 1/1000s. In full sun, f/4 with ISO 400 perfectly balances the fast shutter for EV=0. 135mm brings the athlete close while maintaining a safe shooting distance. Crisp, perfectly exposed action shot.',
+  },
+  {
+    light:'night', subject:'Light Trails', icon:'🌃',
+    desc:'Car light trails at night with a tripod. Continuous light lines, dark sky.',
+    // Creative: night(-4) + 1s(+4) + f/22(-2) + ISO100(-3) = EV -5 ✓ (intentional dark sky)
+    ideal:{shutterIdx:0, apertureIdx:7, isoIdx:0, focalIdx:1},
+    evTarget: -5, // intentional underexposure — sky must stay dark
+    explain:'Light trails need long exposures (1s) for continuous lines. f/22 and ISO 100 keep the overall scene dark — the sky must stay black for the light trails to glow. EV=-5 is intentional: the lights draw themselves on a dark canvas.',
+  },
+  {
+    light:'cloudy', subject:'Floral Macro', icon:'☁️',
+    desc:'Flower in close-up, diffused light. Sharp on subject, dissolved background.',
+    // cloudy(0) + 1/60s(-0.5) + f/5.6(+1) + ISO400(-1) = EV -0.5 ✓
+    ideal:{shutterIdx:4, apertureIdx:4, isoIdx:2, focalIdx:3},
+    explain:'Overcast light is soft and shadowless — ideal for macro. f/5.6 on 85mm creates convincing bokeh even at macro distances. ISO 400 and 1/60s give a clean, sharp result. EV≈-0.5: the slight underexposure protects petal highlight detail.',
+  },
+];
+
+let qState = {
+  idx: 0,
+  answered: [],
+  shutterIdx:5, apertureIdx:5, isoIdx:2, focalIdx:2,
+};
+
+function scoreQuiz(userSh, userAp, userIso, userFocal, sc) {
+  const ideal = sc.ideal;
+  const userEV  = calcEV(userSh, userAp, userIso, sc.light);
+
+  // Exposure: 20 points — target EV 0±1, or special evTarget if defined
+  const evTarget = sc.evTarget !== undefined ? sc.evTarget : 0;
+  const absEV = Math.abs(userEV - evTarget);
+  let expPts;
+  if      (absEV <= 1.0) expPts = 20;
+  else if (absEV <= 1.5) expPts = 14;
+  else if (absEV <= 2.0) expPts = 7;
+  else if (absEV <= 3.0) expPts = 2;
+  else                   expPts = 0;
+  const expGrade = expPts>=14?'good':expPts>=7?'ok':'bad';
+
+  // ISO: 20 points — right ISO for the light (don't over- or under-shoot)
+  const isoDist = Math.abs(userIso - ideal.isoIdx);
+  let isoPts = isoDist===0?20:isoDist===1?14:isoDist===2?6:0;
+  const isoGrade = isoPts>=14?'good':isoPts>=6?'ok':'bad';
+
+  // Aperture: 20 points — right bokeh/sharpness for the subject
+  const apDist = Math.abs(userAp - ideal.apertureIdx);
+  let apPts = apDist===0?20:apDist===1?14:apDist===2?6:0;
+  const apGrade = apPts>=14?'good':apPts>=6?'ok':'bad';
+
+  // Shutter: 20 points — freeze or motion blur consistent with the subject
+  const shDist = Math.abs(userSh - ideal.shutterIdx);
+  let shPts = shDist===0?20:shDist===1?14:shDist===2?6:0;
+  const shGrade = shPts>=14?'good':shPts>=6?'ok':'bad';
+
+  // Focal: 20 points — right angle for the type of shot
+  const focalDist = Math.abs(userFocal - ideal.focalIdx);
+  let focalPts = focalDist===0?20:focalDist===1?12:focalDist===2?4:0;
+  const focalGrade = focalPts>=12?'good':focalPts>=4?'ok':'bad';
+
+  const total = Math.min(100, Math.round(expPts+isoPts+apPts+shPts+focalPts));
+  return {
+    total,
+    breakdown:[
+      {label:'Exposure',   userLabel:`EV ${userEV>=0?'+':''}${userEV.toFixed(1)}`, idealLabel:'EV 0 ± 1',                   pts:expPts,   maxPts:20, grade:expGrade},
+      {label:'ISO',        userLabel:'ISO '+ISOS[userIso].label,                    idealLabel:'ISO '+ISOS[ideal.isoIdx].label, pts:isoPts, maxPts:20, grade:isoGrade},
+      {label:'Aperture',   userLabel:APERTURES[userAp].label,                       idealLabel:APERTURES[ideal.apertureIdx].label, pts:apPts, maxPts:20, grade:apGrade},
+      {label:'Shutter',    userLabel:SHUTTERS[userSh].label,                        idealLabel:SHUTTERS[ideal.shutterIdx].label,   pts:shPts, maxPts:20, grade:shGrade},
+      {label:'Focal',      userLabel:FOCALS[userFocal].label,                       idealLabel:FOCALS[ideal.focalIdx].label,       pts:focalPts, maxPts:20, grade:focalGrade},
+    ],
+  };
+}
+const qCanvas = document.getElementById('quiz-canvas');
+const qCtx = qCanvas.getContext('2d');
+
+function initQuiz(){
+  buildProgress();
+  loadScenario(0);
+}
+
+function buildProgress(){
+  const p=document.getElementById('quiz-progress');
+  p.innerHTML='';
+  document.getElementById('q-total').textContent=SCENARIOS.length;
+  SCENARIOS.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='prog-dot'+(i===0?' current':'');
+    d.id='prog-'+i;
+    p.appendChild(d);
+  });
+}
+
+function loadScenario(i){
+  const sc=SCENARIOS[i];
+  document.getElementById('q-num').textContent=i+1;
+  document.getElementById('q-light-icon').textContent=sc.icon;
+  document.getElementById('q-subject').textContent=sc.subject;
+  document.getElementById('q-desc').textContent=sc.desc;
+  document.getElementById('score-panel').classList.remove('show');
+
+  // Re-hide the blind overlay for new scenario
+  const blind = document.getElementById('scene-blind');
+  blind.classList.remove('revealed');
+  blind.querySelector('.blind-text').innerHTML='Select your settings<br>then press Evaluate';
+
+  // Reset sliders to middle
+  qState.shutterIdx=5; qState.apertureIdx=5; qState.isoIdx=2; qState.focalIdx=2;
+  document.getElementById('qsl-shutter').value=5;
+  document.getElementById('qsl-ap').value=5;
+  document.getElementById('qsl-iso').value=2;
+  document.getElementById('qsl-focal').value=2;
+  updateQVals();
+  // Draw scene underneath (hidden by blind overlay)
+  drawQuizScene(sc.light);
+
+  // Progress dots
+  SCENARIOS.forEach((_,j)=>{
+    const dot=document.getElementById('prog-'+j);
+    if(dot) dot.className='prog-dot'+(j<i?'done':j===i?' current':'');
+  });
+}
+
+function drawQuizScene(light){
+  const W=qCanvas.parentElement.clientWidth||300;
+  const H=qCanvas.parentElement.clientHeight||180;
+  qCanvas.width=W; qCanvas.height=H;
+  const fakeState={...qState, light, film:'provia', wb:'auto'};
+  drawScene(qCtx, W, H, fakeState);
+}
+
+function updateQVals(){
+  document.getElementById('qv-shutter').innerHTML=SHUTTERS[qState.shutterIdx].label.replace('s','<small>s</small>');
+  document.getElementById('qv-ap').textContent=APERTURES[qState.apertureIdx].label;
+  document.getElementById('qv-iso').textContent=ISOS[qState.isoIdx].label;
+  document.getElementById('qv-focal').innerHTML=FOCALS[qState.focalIdx].label.replace('mm','<small>mm</small>');
+}
+
+document.getElementById('qsl-shutter').addEventListener('input',e=>{qState.shutterIdx=+e.target.value;updateQVals();});
+document.getElementById('qsl-ap').addEventListener('input',e=>{qState.apertureIdx=+e.target.value;updateQVals();});
+document.getElementById('qsl-iso').addEventListener('input',e=>{qState.isoIdx=+e.target.value;updateQVals();});
+document.getElementById('qsl-focal').addEventListener('input',e=>{qState.focalIdx=+e.target.value;updateQVals();});
+
+function scoreParam(userIdx, idealIdx, totalSteps){
+  const dist=Math.abs(userIdx-idealIdx);
+  if(dist===0) return {pts:25,grade:'good'};
+  if(dist===1) return {pts:18,grade:'ok'};
+  if(dist===2) return {pts:10,grade:'ok'};
+  return {pts:0,grade:'bad'};
+}
+
+function submitQuiz(){
+  const sc=SCENARIOS[qState.idx];
+
+  // Draw scene with USER's chosen settings, then reveal
+  const fakeState={...qState, light:sc.light, film:'provia', wb:'auto'};
+  const W=qCanvas.parentElement.clientWidth||300;
+  const H=qCanvas.parentElement.clientHeight||180;
+  qCanvas.width=W; qCanvas.height=H;
+  drawScene(qCtx, W, H, fakeState);
+  document.getElementById('scene-blind').classList.add('revealed');
+
+  const result = scoreQuiz(qState.shutterIdx, qState.apertureIdx, qState.isoIdx, qState.focalIdx, sc);
+  qState.answered[qState.idx] = result.total;
+
+  const stars = result.total>=90?'⭐⭐⭐⭐⭐':result.total>=75?'⭐⭐⭐⭐':result.total>=55?'⭐⭐⭐':result.total>=35?'⭐⭐':'⭐';
+  document.getElementById('score-num').textContent = result.total;
+  document.getElementById('score-stars').textContent = stars;
+
+  const bd = document.getElementById('score-breakdown');
+  bd.innerHTML = result.breakdown.map(p=>`
+    <div class="score-item ${p.grade}">
+      <div class="si-label">${p.label}</div>
+      <div class="si-val">${p.userLabel}</div>
+      <div class="si-ideal">Ideal: ${p.idealLabel}</div>
+      <div class="si-pts">${p.pts}/${p.maxPts}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('score-explain').innerHTML=`<strong>Why these values?</strong><br>${sc.explain}`;
+  document.getElementById('score-panel').classList.add('show');
+
+  // Update progress dot
+  const dot=document.getElementById('prog-'+qState.idx);
+  if(dot) dot.className='prog-dot done';
+}
+
+function nextScenario(){
+  qState.idx=(qState.idx+1)%SCENARIOS.length;
+  loadScenario(qState.idx);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ══════════════════════════════════════════
+// TABS
+// ══════════════════════════════════════════
+function switchTab(t){
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',b.textContent.toLowerCase().includes(t)));
+  document.getElementById('sec-sim').classList.toggle('active',t==='sim');
+  document.getElementById('sec-quiz').classList.toggle('active',t==='quiz');
+  if(t==='quiz'){
+    initQuiz();
+    setTimeout(()=>{
+      const W=qCanvas.parentElement.clientWidth||300;
+      const H=qCanvas.parentElement.clientHeight||180;
+      qCanvas.width=W; qCanvas.height=H;
+      drawQuizScene(SCENARIOS[0].light);
+    },50);
+  } else {
+    setTimeout(resize,50);
+  }
+}
+
+// Init
+setLight('sun');
+</script>
+</body>
+</html>
